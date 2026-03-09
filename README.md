@@ -6,12 +6,12 @@
 
 ## Description
 
-This project uses the BMW global sales dataset to predict **units sold** from features such as year, country, model, segment, engine type, price, marketing spend, dealership count, and macroeconomic variables. It covers:
+This project uses the BMW global sales dataset to predict **units sold** from features such as year, month, country, model, segment, engine type, price, marketing spend, dealership count, and macroeconomic variables. It covers:
 
-- Resampling methods (K-fold CV, LOOCV, bootstrap) for polynomial regression
-- Model selection via forward stepwise OLS (AIC/BIC)
-- Shrinkage methods (Ridge and Lasso) with cross-validated tuning
-- Dimensionality reduction (PCR and PLS) and comparison of MSE vs number of components
+- Resampling methods (5-Fold CV, 10-Fold CV, LOOCV, Bootstrap) for polynomial regression (degrees 1–9)
+- Model selection via forward stepwise OLS (AIC / BIC / Adjusted R²), with the optimal model chosen at the global min-AIC point
+- Shrinkage methods (Ridge and Lasso) with cross-validated λ tuning
+- Dimensionality reduction (PCR and PLS) and comparison of CV MSE vs number of components
 
 Training and analysis are done in a Jupyter notebook; an interactive Streamlit app provides visualizations and live predictions from the saved models.
 
@@ -23,10 +23,16 @@ Training and analysis are done in a Jupyter notebook; an interactive Streamlit a
 ML_PR_3/
 ├── README.md
 ├── requirements.txt
-├── bmw_global_sales_dataset.csv   # Input data (target: units_sold)
-├── ML_Group_4_Assignment_3.ipynb   # Training, analysis, and saving models
-├── app.py                         # Streamlit dashboard
-└── models/                        # Created by notebook (pickle artifacts)
+├── bmw_global_sales_dataset.csv        # Input data (target: units_sold)
+├── ML_Group_4_Assignment_3.ipynb       # Training, analysis, and saving models
+├── app.py                              # Streamlit dashboard
+├── images/                             # Plots saved by the notebook
+│   ├── resampling_poly.png             # Resampling MSE curves (5-fold, 10-fold, LOOCV, bootstrap)
+│   ├── resampling_poly_k5_repeats.png  # Repeated 5-fold CV variability
+│   ├── subset_selection.png            # AIC / BIC / Adj R² vs number of predictors
+│   ├── shrinkage.png                   # Ridge & Lasso CV MSE vs λ
+│   └── pca_pls.png                     # PCR vs PLS MSE vs components
+└── models/                             # Created by notebook §4 (pickle artifacts)
     ├── scaler.pkl
     ├── ridge_model.pkl
     ├── lasso_model.pkl
@@ -51,7 +57,7 @@ ML_PR_3/
    ```bash
    python -m venv .venv
    source .venv/bin/activate          # Linux/macOS
-   # .venv\Scripts\activate          # Windows
+   # .venv\Scripts\activate           # Windows
    ```
 
 3. Install dependencies:
@@ -74,10 +80,11 @@ ML_PR_3/
 
 3. Run all cells in order (e.g. **Run → Run All Cells**). This will:
    - Load and encode the data
-   - Run polynomial resampling (degrees 1–5), forward selection, Ridge/Lasso CV, and PCA/PLS
+   - Run polynomial resampling (degrees 1–9), forward stepwise selection, Ridge/Lasso CV, and PCR/PLS
+   - Save plots to the `images/` directory
    - Create the `models/` directory and save all pickle files (scaler, Ridge, Lasso, OLS, feature lists, plot data)
 
-4. Ensure the last section **“Save models for Streamlit app”** runs successfully so the app can load the models.
+4. Ensure the **§4 Save Models** cell runs successfully so the Streamlit app can load everything.
 
 ---
 
@@ -92,35 +99,35 @@ ML_PR_3/
 2. Open the URL shown in the terminal (e.g. `http://localhost:8501`).
 
 3. Use the tabs:
-   - **Data overview** — Table and bar charts (units by country/model).
-   - **Model curves** — Ridge/Lasso MSE vs λ, forward-selection (AIC/BIC/Adj R²), PCR vs PLS (requires `plot_data.pkl`).
-   - **Predictions** — Choose a row (random/first), see the record and Ridge/Lasso/OLS predictions.
-   - **Data explorer** — Compare by pair (two dimensions) and twist filters (year, country, model, segment) to see updated table and metrics.
+   - **📊 Data overview** — Dataset snapshot, descriptive statistics, and bar charts of units sold by country, model, engine type, and segment.
+   - **📈 Model curves** — Four sections matching the notebook: resampling MSE vs degree (images), forward selection AIC/BIC/Adj R² with optimal-predictor markers, Ridge/Lasso CV MSE vs log₁₀(λ) with optimal-λ markers, and PCR vs PLS MSE vs components.
+   - **🔮 Predictions** — Pick any row by index or sample randomly; see the feature record and compare Ridge, Lasso, and OLS (min-AIC) predictions against the actual units sold.
+   - **🔍 Data explorer** — Filter by year, country, model, and segment; view the filtered table, units-sold time series, average by country, and summary statistics.
 
 ---
 
 ## Models covered
 
 | Model / method | Description |
-|---------------|-------------|
-| **Polynomial regression (LinearRegression)** | MSE compared across degrees 1–5 using 5-fold CV, 10-fold CV, LOOCV, and bootstrap. |
-| **Forward stepwise OLS** | Stepwise selection by AIC; final OLS model and selected features saved for the app. |
-| **Ridge regression** | L2 regularization; optimal α chosen by `RidgeCV` over a log-spaced grid (5-fold CV). |
-| **Lasso regression** | L1 regularization; optimal α chosen by `LassoCV` (10-fold CV). |
-| **PCR (Principal Component Regression)** | PCA on scaled features + LinearRegression; 10-fold CV MSE vs number of components (1 to max). |
+|---|---|
+| **Polynomial regression (LinearRegression)** | MSE compared across degrees 1–9 using 5-Fold CV (mean of 15 splits), 10-Fold CV, LOOCV, and Bootstrap. Feature: `marketing_spend_usd`. |
+| **Forward stepwise OLS** | Greedy selection by AIC; the model at the **global min-AIC** step is saved. AIC, BIC, and Adj R² are plotted vs number of predictors. |
+| **Ridge regression** | L2 regularization; optimal λ chosen by `RidgeCV` over a log-spaced grid of 100 values (5-fold CV). |
+| **Lasso regression** | L1 regularization; optimal λ chosen by `LassoCV` (10-fold CV). |
+| **PCR (Principal Component Regression)** | PCA on scaled features + LinearRegression; 10-fold CV MSE vs number of components (1 to min(p, 20)). |
 | **PLS (Partial Least Squares)** | `PLSRegression`; 10-fold CV MSE vs number of components. |
 
-Target variable: **units_sold**. Features are one-hot encoded (categorical) and standardized for Ridge/Lasso/OLS.
+Target variable: **units_sold**. Categorical features are one-hot encoded (`pd.get_dummies(drop_first=True)`) and all features are standardized (`StandardScaler`) for Ridge, Lasso, and OLS.
 
 ---
 
-## Best result(s)
+## Best results
 
-- **Ridge / Lasso:** Best regularization strength is chosen by cross-validation (optimal λ printed in the notebook and shown in the app’s “Model curves” tab).
-- **Forward selection OLS:** The model with **lowest AIC** over the stepwise sequence is kept; its coefficients and selected features are saved and used for predictions in the app.
-- **PCR vs PLS:** The **number of components** that minimizes 10-fold CV MSE is read from the notebook’s PCA/PLS plot (and from `plot_data.pkl` in the app).
+- **Ridge / Lasso:** Optimal λ is chosen by cross-validation and marked with a vertical line on the CV MSE vs λ plot in the app's **Model curves** tab.
+- **Forward stepwise OLS:** The step with the **globally lowest AIC** is selected; its OLS model and feature list are saved to `models/ols_best_model.pkl` and `models/best_features.pkl`, and used for predictions in the app.
+- **PCR vs PLS:** The number of components that minimises 10-fold CV MSE is highlighted on the plot. Both methods are compared side-by-side.
 
-Exact values (e.g. optimal α, minimum MSE, best number of components) appear in the notebook outputs and in the Streamlit app after you run the notebook and load the saved models.
+Exact values (optimal λ, minimum MSE, best number of components/predictors) appear in the notebook outputs and in the Streamlit app once models are loaded.
 
 ---
 
